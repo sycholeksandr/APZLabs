@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Список користувачів</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+
+<body>
+    <h2>Список користувачів</h2>
+    <form name="userForm">
+        <input type="hidden" name="id" value="0" />
+        <div class="form-group">
+            <label for="name">Ім'я:</label>
+            <input class="form-control" name="name" />
+        </div>
+        <div class="form-group">
+            <label for="age">Вік:</label>
+            <input class="form-control" name="age" />
+        </div>
+        <div class="panel-body">
+            <button type="submit" class="btn btn-sm btn-primary">Зберегти</button>
+            <button type="reset" class="btn btn-sm btn-primary">Скинути</button>
+            <button id="remove-all" class="btn btn-sm btn-primary">Видалити все</button>
+        </div>
+    </form>
+    <table class="table table-condensed table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Ім'я</th>
+                <th>Вік</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <style>
+        body {
+            margin: 20px;
+        }
+    </style>
+
+    <script>
+        // збір даних усіх користувачів
+        async function GetUsers() {
+            // відправляємо запит та отримуємо відповідь
+            const response = await fetch("/api/users", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            // якщо запит виконано без помилок
+            if (response.ok === true) {
+                // отримуємо дані
+                const users = await response.json();
+                let rows = document.querySelector("tbody");
+                console.log(users)
+                users.forEach(user => {
+                    // додаємо отримані елементи до таблиці
+                    rows.append(row(user));
+                });
+            }
+        }
+        // отримання користувача за його ІД
+        async function GetUser(id) {
+            const response = await fetch("/api/users/" + id, {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const user = await response.json();
+                const form = document.forms["userForm"];
+                form.elements["id"].value = user._id;
+                form.elements["name"].value = user.name;
+                form.elements["age"].value = user.age;
+            }
+        }
+        // додавання користувача
+        async function CreateUser(userName, userAge) {
+
+            const response = await fetch("api/users", {
+                method: "POST",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: userName,
+                    age: parseInt(userAge, 10)
+                })
+            });
+            if (response.ok === true) {
+                const user = await response.json();
+                reset();
+                document.querySelector("tbody").append(row(user));
+            }
+        }
+        // редагування користувача
+        async function EditUser(userId, userName, userAge) {
+            const response = await fetch("api/users", {
+                method: "PUT",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    _id: userId,
+                    name: userName,
+                    age: parseInt(userAge, 10)
+                })
+            });
+            if (response.ok === true) {
+                const user = await response.json();
+                reset();
+                console.log(user);
+                document.querySelector("tr[data-rowid='" + user._id + "']").replaceWith(row(user));
+            }
+        }
+        // видалення користувача
+        async function DeleteUser(id) {
+            const response = await fetch("/api/users/" + id, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const user = await response.json();
+                console.log(user);
+                document.querySelector("tr[data-rowid='" + user._id + "']").remove();
+            }
+        }
+
+        // скидання форми
+        function reset() {
+            const form = document.forms["userForm"];
+            form.reset();
+            form.elements["id"].value = 0;
+        }
+        // створення рядку таблиці
+        function row(user) {
+
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", user._id);
+
+            const idTd = document.createElement("td");
+            idTd.append(user._id);
+            tr.append(idTd);
+
+            const nameTd = document.createElement("td");
+            nameTd.append(user.name);
+            tr.append(nameTd);
+
+            const ageTd = document.createElement("td");
+            ageTd.append(user.age);
+            tr.append(ageTd);
+
+            const linksTd = document.createElement("td");
+
+            const editLink = document.createElement("a");
+            editLink.setAttribute("data-id", user._id);
+            editLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            editLink.append("Змінити");
+            editLink.addEventListener("click", e => {
+                e.preventDefault();
+                console.log(user._id);
+                GetUser(user._id);
+            });
+            linksTd.append(editLink);
+
+            const removeLink = document.createElement("a");
+            removeLink.setAttribute("data-id", user._id);
+            removeLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            removeLink.append("Видалити");
+            removeLink.addEventListener("click", e => {
+
+                e.preventDefault();
+                DeleteUser(user._id);
+            });
+
+            linksTd.append(removeLink);
+            tr.appendChild(linksTd);
+
+            return tr;
+        }
+
+        document.querySelector("#remove-all").addEventListener("click", e => {
+            e.preventDefault();
+            fetch("/api/users", {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            }).then(response => {
+                if (response.ok === true) {
+                    document.querySelector("tbody").innerHTML = "";
+                }
+            });
+        });
+
+        // відправка форми
+        document.forms["userForm"].addEventListener("submit", e => {
+            e.preventDefault();
+            const form = document.forms["userForm"];
+            const id = form.elements["id"].value;
+            const name = form.elements["name"].value;
+            const age = form.elements["age"].value;
+
+            if (!name || !age) return;
+
+            if (id == 0)
+                CreateUser(name, age);
+            else
+                EditUser(id, name, age);
+        });
+
+        // завантаження користувачів
+        GetUsers();
+    </script>
+</body>
+
+</html>
